@@ -1,42 +1,57 @@
+
 async function fetchSignals() {
-  const signals = [
-    {
-      pair: "BTC/USDT",
-      entry: 64000.12,
-      target: 67200.13,
-      stop: 62720.11,
-      time: new Date().toLocaleTimeString(),
-      strength: "Strong",
-      status: "✅ Signal abhi bhi valid hai"
-    },
-    {
-      pair: "ETH/USDT",
-      entry: 3400.45,
-      target: 3570.47,
-      stop: 3332.44,
-      time: new Date().toLocaleTimeString(),
-      strength: "Medium",
-      status: "✅ Signal abhi bhi valid hai"
+    document.getElementById("signals-container").innerHTML = "⏳ Real-time signals la rahe hain...";
+
+    try {
+        const res = await fetch("https://api.binance.com/api/v3/ticker/24hr");
+        const data = await res.json();
+
+        const usdtPairs = data.filter(pair => 
+            pair.symbol.endsWith("USDT") && !pair.symbol.includes("UP") && !pair.symbol.includes("DOWN")
+        );
+
+        const signals = usdtPairs
+            .map(pair => {
+                const symbol = pair.symbol;
+                const lastPrice = parseFloat(pair.lastPrice);
+                const priceChangePercent = parseFloat(pair.priceChangePercent);
+
+                if (priceChangePercent >= 3) {
+                    return {
+                        pair: symbol.replace("USDT", "/USDT"),
+                        entry: lastPrice.toFixed(2),
+                        target: (lastPrice * 1.05).toFixed(2),
+                        stopLoss: (lastPrice * 0.98).toFixed(2),
+                        change: priceChangePercent.toFixed(2)
+                    };
+                }
+                return null;
+            })
+            .filter(Boolean)
+            .slice(0, 10);
+
+        if (signals.length === 0) {
+            document.getElementById("signals-container").innerHTML = "😕 Abhi koi strong pump signal nahi mila.";
+            return;
+        }
+
+        let html = "";
+        signals.forEach(signal => {
+            html += `<div style="margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px;">
+                <strong>🚨 Yeh coin pump ho raha hai: ${signal.pair}</strong><br>
+                📥 Entry: $${signal.entry}<br>
+                🎯 Target: $${signal.target} (+5%)<br>
+                🛑 Stop Loss: $${signal.stopLoss} (-2%)<br>
+                📊 Price Change: ${signal.change}%
+            </div>`;
+        });
+
+        document.getElementById("signals-container").innerHTML = html;
+
+    } catch (err) {
+        document.getElementById("signals-container").innerHTML = "❌ Signal laane mein error aa gaya.";
+        console.error(err);
     }
-  ];
-
-  const container = document.getElementById("signals");
-  container.innerHTML = signals.map(signal => `
-    <div>
-      <p>🚨 Yeh coin pump ho raha hai: <strong>${signal.pair}</strong></p>
-      <p>📥 Entry: $${signal.entry.toFixed(5)}</p>
-      <p>🎯 Target: $${signal.target.toFixed(5)} (+5%)</p>
-      <p>🛑 Stop Loss: $${signal.stop.toFixed(5)} (-2%)</p>
-      <p>🕒 Time: ${signal.time}</p>
-      <p>💪 Signal Strength: ${signal.strength}</p>
-      <p>${signal.status}</p>
-      <hr/>
-    </div>
-  `).join("");
-}
-
-function refreshSignals() {
-  fetchSignals();
 }
 
 fetchSignals();
