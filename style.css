@@ -1,1 +1,19 @@
-body { background-color: black; color: lime; font-family: sans-serif; }
+body {
+  background: #111;
+  color: white;
+  font-family: sans-serif;
+  padding: 10px;
+}
+
+h1 {
+  color: #00f7c7;
+}
+
+.signal {
+  border-bottom: 1px solid #333;
+  padding: 10px 0;
+}
+
+strong {
+  color: #ff5555;
+}
