@@ -3,12 +3,84 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🚀 5 Star Pump Signal</title>
-  <link rel="stylesheet" href="style.css"/>
+  <title>5 Star Pump Signal</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #111;
+      color: #fff;
+      padding: 20px;
+    }
+    .signal {
+      background: #222;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(255,255,255,0.1);
+    }
+    button {
+      background-color: #ffcc00;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
   <h1>🚀 5 Star Pump Signal</h1>
-  <div id="signals"></div>
-  <script src="script.js"></script>
+  <div id="signals">Loading signals...</div>
+  <button onclick="fetchSignals()">🔁 Refresh Signals</button>
+
+  <script>
+    const apiBase = "https://api.binance.com";
+    const percentChangeThreshold = 3;
+
+    async function fetchSignals() {
+      document.getElementById("signals").innerHTML = "⏳ Loading signals...";
+      try {
+        const res = await fetch(`${apiBase}/api/v3/ticker/24hr`);
+        const data = await res.json();
+        const usdtPairs = data.filter(d => d.symbol.endsWith("USDT") && !d.symbol.includes("UP") && !d.symbol.includes("DOWN"));
+        
+        const topPumps = usdtPairs.filter(d => parseFloat(d.priceChangePercent) >= percentChangeThreshold);
+        const now = new Date();
+        const signalHTML = topPumps.map(coin => {
+          const symbol = coin.symbol.replace("USDT", "/USDT");
+          const entry = parseFloat(coin.lastPrice);
+          const target = entry + entry * 0.05;
+          const stopLoss = entry - entry * 0.02;
+
+          const priceChange = parseFloat(coin.priceChangePercent);
+          let strength = "Weak";
+          if (priceChange >= 3 && priceChange < 5) strength = "Medium";
+          if (priceChange >= 5) strength = "Strong";
+
+          const timeStr = now.toLocaleTimeString();
+
+          return `
+            <div class="signal">
+              🚨 Yeh coin pump ho raha hai: <strong>${symbol}</strong><br><br>
+              📥 Entry: $${entry.toFixed(5)}<br>
+              🎯 Target: $${target.toFixed(5)} (+5%)<br>
+              🛑 Stop Loss: $${stopLoss.toFixed(5)} (-2%)<br>
+              🕒 Time: ${timeStr}<br>
+              💪 Signal Strength: ${strength}<br>
+              ✅ Signal abhi bhi valid hai
+            </div>
+          `;
+        }).join("");
+
+        document.getElementById("signals").innerHTML = signalHTML || "🚫 Abhi koi pump signal available nahi.";
+      } catch (err) {
+        document.getElementById("signals").innerHTML = "❌ Error loading signals.";
+      }
+    }
+
+    fetchSignals();
+    setInterval(fetchSignals, 300000); // auto refresh every 5 minutes
+  </script>
 </body>
 </html>
