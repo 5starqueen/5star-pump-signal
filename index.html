@@ -6,81 +6,117 @@
   <title>5 Star Pump Signal</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background-color: #111;
+      background: #0d0d0d;
       color: #fff;
+      font-family: Arial, sans-serif;
       padding: 20px;
     }
     .signal {
-      background: #222;
+      background: #1a1a1a;
+      border-left: 5px solid #00ffcc;
       padding: 15px;
       margin-bottom: 15px;
       border-radius: 10px;
-      box-shadow: 0 0 10px rgba(255,255,255,0.1);
     }
     button {
-      background-color: #ffcc00;
-      border: none;
+      background: #00ffcc;
+      color: #000;
       padding: 10px 20px;
+      border: none;
       border-radius: 10px;
       font-weight: bold;
       cursor: pointer;
-      margin-top: 20px;
     }
   </style>
 </head>
 <body>
   <h1>🚀 5 Star Pump Signal</h1>
-  <div id="signals">Loading signals...</div>
-  <button onclick="fetchSignals()">🔁 Refresh Signals</button>
+  <div id="signals">Loading real signals...</div>
+  <button onclick="getSignals()">🔁 Refresh Signals</button>
 
   <script>
-    const apiBase = "https://api.binance.com";
-    const percentChangeThreshold = 3;
+    const api = "https://api.binance.com";
+    async function getSignals() {
+      document.getElementById("signals").innerHTML = "⏳ Checking for signals...";
+      const tickerRes = await fetch(`${api}/api/v3/ticker/price`);
+      const prices = await tickerRes.json();
 
-    async function fetchSignals() {
-      document.getElementById("signals").innerHTML = "⏳ Loading signals...";
-      try {
-        const res = await fetch(`${apiBase}/api/v3/ticker/24hr`);
-        const data = await res.json();
-        const usdtPairs = data.filter(d => d.symbol.endsWith("USDT") && !d.symbol.includes("UP") && !d.symbol.includes("DOWN"));
-        
-        const topPumps = usdtPairs.filter(d => parseFloat(d.priceChangePercent) >= percentChangeThreshold);
-        const now = new Date();
-        const signalHTML = topPumps.map(coin => {
-          const symbol = coin.symbol.replace("USDT", "/USDT");
-          const entry = parseFloat(coin.lastPrice);
-          const target = entry + entry * 0.05;
-          const stopLoss = entry - entry * 0.02;
+      const rsiCoins = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "DOGEUSDT", "TRXUSDT", "MATICUSDT", "XRPUSDT", "PEPEUSDT", "SHIBUSDT"];
+      const signals = [];
 
-          const priceChange = parseFloat(coin.priceChangePercent);
-          let strength = "Weak";
-          if (priceChange >= 3 && priceChange < 5) strength = "Medium";
-          if (priceChange >= 5) strength = "Strong";
+      for (const symbol of rsiCoins) {
+        try {
+          const kRes = await fetch(`${api}/api/v3/klines?symbol=${symbol}&interval=5m&limit=100`);
+          const klines = await kRes.json();
+          const closes = klines.map(k => parseFloat(k[4]));
 
-          const timeStr = now.toLocaleTimeString();
+          const rsi = getRSI(closes);
+          const macd = getMACD(closes);
 
-          return `
-            <div class="signal">
-              🚨 Yeh coin pump ho raha hai: <strong>${symbol}</strong><br><br>
-              📥 Entry: $${entry.toFixed(5)}<br>
-              🎯 Target: $${target.toFixed(5)} (+5%)<br>
-              🛑 Stop Loss: $${stopLoss.toFixed(5)} (-2%)<br>
-              🕒 Time: ${timeStr}<br>
-              💪 Signal Strength: ${strength}<br>
-              ✅ Signal abhi bhi valid hai
-            </div>
-          `;
-        }).join("");
+          if (rsi < 30 && macd.histogram > 0 && macd.macd > macd.signal) {
+            const entry = parseFloat(closes[closes.length - 1]);
+            const target = entry + entry * 0.05;
+            const stop = entry - entry * 0.02;
+            const strength = macd.histogram > 0.3 ? "Strong" : macd.histogram > 0.15 ? "Medium" : "Weak";
+            const time = new Date().toLocaleTimeString();
 
-        document.getElementById("signals").innerHTML = signalHTML || "🚫 Abhi koi pump signal available nahi.";
-      } catch (err) {
-        document.getElementById("signals").innerHTML = "❌ Error loading signals.";
+            signals.push(`
+              <div class="signal">
+                🚨 Yeh coin pump ho raha hai: <strong>${symbol.replace("USDT", "/USDT")}</strong><br><br>
+                📥 Entry: $${entry.toFixed(5)}<br>
+                🎯 Target: $${target.toFixed(5)} (+5%)<br>
+                🛑 Stop Loss: $${stop.toFixed(5)} (-2%)<br>
+                🕒 Time: ${time}<br>
+                💪 Signal Strength: ${strength}<br>
+                ✅ Signal abhi bhi valid hai
+              </div>
+            `);
+          }
+        } catch (e) {
+          console.log(`Error for ${symbol}:`, e);
+        }
       }
+
+      document.getElementById("signals").innerHTML = signals.length
+        ? signals.join("")
+        : "❌ Abhi koi strong RSI + MACD signal nahi mila.";
     }
 
-    fetchSignals();
-    setInterval(fetchSignals, 300000); // auto refresh every 5 minutes
+    function getRSI(closes, period = 14) {
+      let gains = 0, losses = 0;
+      for (let i = 1; i <= period; i++) {
+        const diff = closes[closes.length - i] - closes[closes.length - i - 1];
+        if (diff >= 0) gains += diff;
+        else losses -= diff;
+      }
+      const rs = gains / losses;
+      return 100 - (100 / (1 + rs));
+    }
+
+    function getMACD(closes) {
+      const ema = (data, period) => {
+        const k = 2 / (period + 1);
+        let emaArray = [data[0]];
+        for (let i = 1; i < data.length; i++) {
+          emaArray.push(data[i] * k + emaArray[i - 1] * (1 - k));
+        }
+        return emaArray;
+      };
+
+      const ema12 = ema(closes, 12);
+      const ema26 = ema(closes, 26);
+      const macdLine = ema12.map((val, i) => val - ema26[i]);
+      const signalLine = ema(macdLine.slice(ema26.length - macdLine.length), 9);
+      const histogram = macdLine[macdLine.length - 1] - signalLine[signalLine.length - 1];
+
+      return {
+        macd: macdLine[macdLine.length - 1],
+        signal: signalLine[signalLine.length - 1],
+        histogram,
+      };
+    }
+
+    getSignals();
   </script>
 </body>
 </html>
