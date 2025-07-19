@@ -1,55 +1,90 @@
-const signalsDiv = document.getElementById('signals');
+const API_URL = "https://api.binance.com/api/v3/ticker/price";
+const coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "DOGEUSDT"];
 
-function generateFakeSignal() {
-  const coins = ['BTC/USDT', 'ETH/USDT', 'BIFI/USDT', 'EPIC/USDT', 'HEI/USDT', 'IOTX/USDT'];
-  const coin = coins[Math.floor(Math.random() * coins.length)];
-  const entry = (Math.random() * 100).toFixed(2);
-  const priceChange = (Math.random() * 10).toFixed(2);
-  const target = (entry * 1.05).toFixed(2);
-  const stopLoss = (entry * 0.98).toFixed(2);
-
-  let strength = 'Weak';
-  if (priceChange > 4 && priceChange <= 7) strength = 'Medium';
-  else if (priceChange > 7) strength = 'Strong';
-
-  return {
-    coin,
-    entry,
-    target,
-    stopLoss,
-    priceChange,
-    strength,
-    time: new Date().toLocaleTimeString()
-  };
+async function fetchPrice(symbol) {
+  const res = await fetch(`${API_URL}?symbol=${symbol}`);
+  const data = await res.json();
+  return parseFloat(data.price);
 }
 
-function showSignal(signal) {
-  const div = document.createElement('div');
-  div.className = 'signal';
-  div.innerHTML = `
-    <strong>🚨 Yeh coin pump ho raha hai:</strong> ${signal.coin}<br/>
-    💼 Entry: $${signal.entry}<br/>
-    🎯 Target: $${signal.target} (+5%)<br/>
-    🛑 Stop Loss: $${signal.stopLoss} (-2%)<br/>
-    📊 Price Change: ${signal.priceChange}%<br/>
-    🔥 Strength: ${signal.strength}<br/>
-    🕒 Time: ${signal.time}
-  `;
-  signalsDiv.prepend(div);
+function simulateSupportResistance(symbol) {
+  // Fake support/resistance values just for demo
+  const levels = {
+    BTCUSDT: { support: 64000, resistance: 66000 },
+    ETHUSDT: { support: 3300, resistance: 3500 },
+    SOLUSDT: { support: 140, resistance: 160 },
+    BNBUSDT: { support: 570, resistance: 600 },
+    DOGEUSDT: { support: 0.12, resistance: 0.145 },
+  };
+  return levels[symbol];
+}
 
-  // Auto hide if target hit
-  if (parseFloat(signal.priceChange) >= 5) {
-    setTimeout(() => {
-      div.remove();
-    }, 10000); // hide after 10 seconds
+function checkConditions(price, support, resistance) {
+  // Price must be close to support (within 1.5%) and in uptrend
+  const nearSupport = price <= support * 1.015;
+  const belowResistance = price < resistance;
+
+  // Simulate fake RSI + MACD buy confirmation
+  const rsiBuy = Math.random() > 0.3;
+  const macdBuy = Math.random() > 0.4;
+
+  return nearSupport && belowResistance && rsiBuy && macdBuy;
+}
+
+function getSignalStrength() {
+  const rand = Math.random();
+  if (rand > 0.8) return "Strong";
+  if (rand > 0.5) return "Medium";
+  return "Weak";
+}
+
+async function fetchSignals() {
+  const container = document.getElementById("signals");
+  container.innerHTML = "⏳ Loading signals...";
+
+  const signals = [];
+
+  for (const coin of coins) {
+    const price = await fetchPrice(coin);
+    const { support, resistance } = simulateSupportResistance(coin);
+
+    const isValid = checkConditions(price, support, resistance);
+
+    if (isValid) {
+      const entry = price.toFixed(2);
+      const target = (resistance * 0.995).toFixed(2); // just below resistance
+      const stopLoss = (support * 0.985).toFixed(2); // just below support
+      const strength = getSignalStrength();
+
+      signals.push({
+        coin,
+        entry,
+        target,
+        stopLoss,
+        strength,
+        time: new Date().toLocaleTimeString(),
+      });
+    }
+  }
+
+  if (signals.length === 0) {
+    container.innerHTML = "❌ Abhi koi signal nahi mila";
+    return;
+  }
+
+  container.innerHTML = "";
+
+  for (const s of signals) {
+    const signalEl = document.createElement("div");
+    signalEl.className = "signal";
+    signalEl.innerHTML = `
+      <strong>${s.coin}</strong><br/>
+      🟢 Entry: ${s.entry} <br/>
+      🎯 Target: ${s.target} <br/>
+      🛑 Stop Loss: ${s.stopLoss} <br/>
+      ⚡ Strength: <b>${s.strength}</b><br/>
+      🕒 Time: ${s.time}
+    `;
+    container.appendChild(signalEl);
   }
 }
-
-// Show a new fake signal every 15 seconds
-setInterval(() => {
-  const signal = generateFakeSignal();
-  showSignal(signal);
-}, 15000);
-
-// Initial signal
-showSignal(generateFakeSignal());
