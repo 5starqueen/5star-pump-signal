@@ -1,148 +1,18 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>5 Star Pump Signal</title>
-  <style>
-    body {
-      background: #0d0d0d;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    .signal {
-      background: #1a1a1a;
-      border-left: 5px solid #00ffcc;
-      padding: 15px;
-      margin-bottom: 15px;
-      border-radius: 10px;
-    }
-    .rejected {
-      background: #2b2b2b;
-      color: #ccc;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-left: 4px solid #444;
-      border-radius: 8px;
-      font-size: 14px;
-    }
-    button {
-      background: #00ffcc;
-      color: #000;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 10px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 15px;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <h1>🚀 5 Star Pump Signal</h1>
-  <div id="signals">⏳ Loading signals...</div>
-  <button onclick="getSignals()">🔁 Refresh Signals</button>
-  <div id="debug"></div>
+  <button onclick="fetchSignals()">🔄 Refresh Signals</button>
+  <div id="signals"></div>
 
-  <script>
-    const api = "https://api.binance.com";
-    async function getSignals() {
-      document.getElementById("signals").innerHTML = "⏳ Checking for signals...";
-      document.getElementById("debug").innerHTML = "";
-
-      const tickerRes = await fetch(`${api}/api/v3/ticker/price`);
-      const prices = await tickerRes.json();
-
-      const rsiCoins = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "DOGEUSDT", "TRXUSDT", "MATICUSDT", "XRPUSDT", "PEPEUSDT", "SHIBUSDT"];
-      const signals = [];
-      const debugInfo = [];
-
-      for (const symbol of rsiCoins) {
-        try {
-          const kRes = await fetch(`${api}/api/v3/klines?symbol=${symbol}&interval=5m&limit=100`);
-          const klines = await kRes.json();
-          const closes = klines.map(k => parseFloat(k[4]));
-
-          const rsi = getRSI(closes);
-          const macd = getMACD(closes);
-          const latestPrice = closes[closes.length - 1];
-
-          let reason = '';
-          if (rsi >= 30) reason += "RSI not oversold. ";
-          if (macd.macd <= macd.signal) reason += "MACD crossover not bullish. ";
-          if (macd.histogram <= 0) reason += "MACD histogram not positive. ";
-
-          if (rsi < 30 && macd.histogram > 0 && macd.macd > macd.signal) {
-            const entry = latestPrice;
-            const target = entry * 1.05;
-            const stop = entry * 0.98;
-            const strength = macd.histogram > 0.3 ? "Strong" : macd.histogram > 0.15 ? "Medium" : "Weak";
-            const time = new Date().toLocaleTimeString();
-
-            signals.push(`
-              <div class="signal">
-                🚨 Yeh coin pump ho raha hai: <strong>${symbol.replace("USDT", "/USDT")}</strong><br><br>
-                📥 Entry: $${entry.toFixed(5)}<br>
-                🎯 Target: $${target.toFixed(5)} (+5%)<br>
-                🛑 Stop Loss: $${stop.toFixed(5)} (-2%)<br>
-                🕒 Time: ${time}<br>
-                💪 Signal Strength: ${strength}<br>
-                ✅ Signal abhi bhi valid hai
-              </div>
-            `);
-          } else {
-            debugInfo.push(`<div class="rejected">❌ ${symbol}: ${reason}</div>`);
-          }
-
-        } catch (e) {
-          debugInfo.push(`<div class="rejected">❌ ${symbol}: Error fetching data</div>`);
-        }
-      }
-
-      document.getElementById("signals").innerHTML = signals.length
-        ? signals.join("")
-        : "❌ Abhi koi strong RSI + MACD signal nahi mila.";
-
-      document.getElementById("debug").innerHTML = `<h3>🔍 Debug Info:</h3>` + debugInfo.join("");
-    }
-
-    function getRSI(closes, period = 14) {
-      let gains = 0, losses = 0;
-      for (let i = 1; i <= period; i++) {
-        const diff = closes[closes.length - i] - closes[closes.length - i - 1];
-        if (diff >= 0) gains += diff;
-        else losses -= diff;
-      }
-      const rs = gains / losses;
-      return 100 - (100 / (1 + rs));
-    }
-
-    function getMACD(closes) {
-      const ema = (data, period) => {
-        const k = 2 / (period + 1);
-        let emaArray = [data[0]];
-        for (let i = 1; i < data.length; i++) {
-          emaArray.push(data[i] * k + emaArray[i - 1] * (1 - k));
-        }
-        return emaArray;
-      };
-
-      const ema12 = ema(closes, 12);
-      const ema26 = ema(closes, 26);
-      const macdLine = ema12.map((val, i) => val - ema26[i]);
-      const signalLine = ema(macdLine.slice(ema26.length - macdLine.length), 9);
-      const histogram = macdLine[macdLine.length - 1] - signalLine[signalLine.length - 1];
-
-      return {
-        macd: macdLine[macdLine.length - 1],
-        signal: signalLine[signalLine.length - 1],
-        histogram,
-      };
-    }
-
-    getSignals();
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
-
