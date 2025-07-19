@@ -1,19 +1,37 @@
 body {
-  background: #111;
-  color: white;
   font-family: sans-serif;
-  padding: 10px;
+  background: #111;
+  color: #fff;
+  padding: 1rem;
+  text-align: center;
 }
 
 h1 {
-  color: #00f7c7;
+  color: #0f0;
+  margin-bottom: 1rem;
+}
+
+button {
+  background: #0a0;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  margin-bottom: 1rem;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+#signals {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .signal {
-  border-bottom: 1px solid #333;
-  padding: 10px 0;
-}
-
-strong {
-  color: #ff5555;
+  background: #222;
+  border-left: 5px solid #0f0;
+  padding: 1rem;
+  text-align: left;
+  border-radius: 8px;
 }
