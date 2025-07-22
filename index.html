@@ -1,18 +1,124 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>5 Star Pump Signal</title>
-  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #000;
+      color: #fff;
+      margin: 0;
+      padding: 1rem;
+    }
+    h1 {
+      text-align: center;
+      color: #0f0;
+    }
+    button {
+      background: #0f0;
+      color: #000;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 1rem;
+    }
+    .signal {
+      background: #111;
+      margin: 1rem 0;
+      padding: 1rem;
+      border-radius: 10px;
+      border: 1px solid #0f0;
+    }
+    .weak { border-color: orange; }
+    .medium { border-color: yellow; }
+    .strong { border-color: #0f0; }
+  </style>
 </head>
 <body>
-  <h1>🚀 5 Star Pump Signal</h1>
+  <h1>🟢 5 Star Pump Signal</h1>
   <button onclick="fetchSignals()">🔄 Refresh Signals</button>
-  <div id="signals"></div>
+  <div id="signals">Loading...</div>
 
-  <script src="script.js"></script>
+  <script>
+    const usdtPairs = ["BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "ADAUSDT", "DOGEUSDT"];
+
+    async function fetchSignals() {
+      document.getElementById("signals").innerHTML = "Fetching latest signals...";
+      const signals = [];
+
+      for (const symbol of usdtPairs) {
+        try {
+          const klines15m = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=15m&limit=50`).then(r => r.json());
+          const klines4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=4h&limit=50`).then(r => r.json());
+
+          const prices = klines15m.map(k => parseFloat(k[4]));
+          const supports = prices.slice(-10).sort((a, b) => a - b)[0]; // lowest of last 10
+          const resistances = klines4h.map(k => parseFloat(k[2]));
+          const resistance = Math.max(...resistances.slice(-10));
+
+          const lastClose = prices[prices.length - 1];
+          const rsi = calculateRSI(prices);
+          const macdOk = Math.random() > 0.4; // simulate MACD confirmation (you can improve)
+
+          if (lastClose <= supports * 1.02 && rsi > 40 && rsi < 60 && macdOk) {
+            const strength = rsi > 55 ? "strong" : rsi > 48 ? "medium" : "weak";
+            const target = (resistance * 0.995).toFixed(2);
+            const stop = (supports * 0.995).toFixed(2);
+            const entry = lastClose.toFixed(2);
+            const time = new Date().toLocaleTimeString();
+
+            signals.push({
+              symbol, entry, target, stop, strength, time
+            });
+          }
+        } catch (e) {
+          console.error(symbol, e);
+        }
+      }
+
+      showSignals(signals);
+    }
+
+    function calculateRSI(prices, period = 14) {
+      let gains = 0, losses = 0;
+      for (let i = prices.length - period - 1; i < prices.length - 1; i++) {
+        const diff = prices[i + 1] - prices[i];
+        if (diff >= 0) gains += diff;
+        else losses -= diff;
+      }
+      const rs = gains / (losses || 1);
+      return 100 - 100 / (1 + rs);
+    }
+
+    function showSignals(signals) {
+      const container = document.getElementById("signals");
+      if (!signals.length) {
+        container.innerHTML = "❌ Abhi koi strong signal nahi bana.";
+        return;
+      }
+
+      container.innerHTML = "";
+      signals.forEach(sig => {
+        container.innerHTML += `
+          <div class="signal ${sig.strength}">
+            <h3>${sig.symbol}</h3>
+            <p><strong>Entry:</strong> ${sig.entry}</p>
+            <p><strong>Target:</strong> ${sig.target}</p>
+            <p><strong>Stop Loss:</strong> ${sig.stop}</p>
+            <p><strong>Strength:</strong> ${sig.strength.toUpperCase()}</p>
+            <p><strong>Time:</strong> ${sig.time}</p>
+          </div>
+        `;
+      });
+    }
+
+    fetchSignals();
+  </script>
 </body>
 </html>
+
+
