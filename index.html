@@ -7,118 +7,209 @@
   <style>
     body {
       font-family: sans-serif;
-      background: #000;
-      color: #fff;
-      margin: 0;
-      padding: 1rem;
+      padding: 10px;
+      background: #f2f2f2;
+      color: #333;
     }
     h1 {
       text-align: center;
-      color: #0f0;
-    }
-    button {
-      background: #0f0;
-      color: #000;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 1rem;
     }
     .signal {
-      background: #111;
-      margin: 1rem 0;
-      padding: 1rem;
-      border-radius: 10px;
-      border: 1px solid #0f0;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 15px;
+      margin: 10px 0;
     }
-    .weak { border-color: orange; }
-    .medium { border-color: yellow; }
-    .strong { border-color: #0f0; }
+    .signal strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .btn {
+      padding: 10px 20px;
+      margin: 10px 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    .btn:disabled {
+      background: #ccc;
+    }
+    #pagination {
+      text-align: center;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
-  <h1>🟢 5 Star Pump Signal</h1>
-  <button onclick="fetchSignals()">🔄 Refresh Signals</button>
-  <div id="signals">Loading...</div>
+  <h1>⭐ 5 Star Pump Signal</h1>
+  <button class="btn" onclick="fetchSignals()">🔄 Refresh</button>
+  <div id="signalContainer"></div>
+  <div id="pagination">
+    <button class="btn" onclick="prevPage()" id="prevBtn">⬅️ Previous</button>
+    <button class="btn" onclick="nextPage()" id="nextBtn">Next ➡️</button>
+  </div>
 
   <script>
-    const usdtPairs = ["BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "ADAUSDT", "DOGEUSDT"];
+    let signals = [];
+    let currentPage = 1;
+    const perPage = 10;
 
     async function fetchSignals() {
-      document.getElementById("signals").innerHTML = "Fetching latest signals...";
-      const signals = [];
+      document.getElementById('signalContainer').innerHTML = '⏳ Loading...';
 
-      for (const symbol of usdtPairs) {
-        try {
-          const klines15m = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=15m&limit=50`).then(r => r.json());
-          const klines4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=4h&limit=50`).then(r => r.json());
+      try {
+        // Fake delay for UX
+        await new Promise(r => setTimeout(r, 1000));
 
-          const prices = klines15m.map(k => parseFloat(k[4]));
-          const supports = prices.slice(-10).sort((a, b) => a - b)[0]; // lowest of last 10
-          const resistances = klines4h.map(k => parseFloat(k[2]));
-          const resistance = Math.max(...resistances.slice(-10));
+        const response = await fetch('https://api.binance.com/api/v3/ticker/price');
+        const prices = await response.json();
 
-          const lastClose = prices[prices.length - 1];
-          const rsi = calculateRSI(prices);
-          const macdOk = Math.random() > 0.4; // simulate MACD confirmation (you can improve)
+        const usdtPairs = prices.filter(p => p.symbol.endsWith('USDT') && !p.symbol.includes('1000') && !p.symbol.includes('DOWN') && !p.symbol.includes('UP')).slice(0, 150);
 
-          if (lastClose <= supports * 1.02 && rsi > 40 && rsi < 60 && macdOk) {
-            const strength = rsi > 55 ? "strong" : rsi > 48 ? "medium" : "weak";
-            const target = (resistance * 0.995).toFixed(2);
-            const stop = (supports * 0.995).toFixed(2);
-            const entry = lastClose.toFixed(2);
-            const time = new Date().toLocaleTimeString();
+        signals = [];
 
-            signals.push({
-              symbol, entry, target, stop, strength, time
-            });
+        for (let pair of usdtPairs) {
+          const symbol = pair.symbol;
+
+          try {
+            const klines15m = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=15m&limit=100`).then(res => res.json());
+            const klines4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=4h&limit=100`).then(res => res.json());
+
+            const closePrices = klines15m.map(k => parseFloat(k[4]));
+            const recentClose = closePrices[closePrices.length - 1];
+            const low15 = Math.min(...klines15m.map(k => parseFloat(k[3])));
+            const high4h = Math.max(...klines4h.map(k => parseFloat(k[2])));
+            const support = low15;
+            const resistance = high4h;
+
+            const entry = recentClose;
+            const target = parseFloat((resistance * 0.985).toFixed(4));
+            const stopLoss = parseFloat((support * 0.98).toFixed(4));
+
+            const rsi = calculateRSI(closePrices);
+            const macdSignal = calculateMACD(closePrices);
+
+            if (entry <= support * 1.03 && rsi > 45 && macdSignal) {
+              const strength = getStrength(entry, support, resistance, rsi);
+
+              signals.push({
+                symbol,
+                entry: entry.toFixed(4),
+                target,
+                stopLoss,
+                time: new Date().toLocaleTimeString(),
+                strength
+              });
+            }
+
+          } catch (e) {
+            // Ignore broken pairs
           }
-        } catch (e) {
-          console.error(symbol, e);
         }
+
+        currentPage = 1;
+        renderSignals();
+
+      } catch (err) {
+        document.getElementById('signalContainer').innerText = '❌ Error fetching data';
+        console.error(err);
+      }
+    }
+
+    function renderSignals() {
+      const container = document.getElementById('signalContainer');
+      container.innerHTML = '';
+
+      const start = (currentPage - 1) * perPage;
+      const pageSignals = signals.slice(start, start + perPage);
+
+      if (pageSignals.length === 0) {
+        container.innerHTML = '<p>🚫 No valid signals at the moment</p>';
       }
 
-      showSignals(signals);
+      for (let s of pageSignals) {
+        const el = document.createElement('div');
+        el.className = 'signal';
+        el.innerHTML = `
+          <strong>💰 Coin: ${s.symbol}</strong>
+          📉 Entry: <b>${s.entry}</b><br>
+          🎯 Target: <b>${s.target}</b><br>
+          🛑 Stop Loss: <b>${s.stopLoss}</b><br>
+          🕒 Time: ${s.time}<br>
+          ⚡ Strength: <b>${s.strength}</b>
+        `;
+        container.appendChild(el);
+      }
+
+      document.getElementById('prevBtn').disabled = currentPage === 1;
+      document.getElementById('nextBtn').disabled = start + perPage >= signals.length;
+    }
+
+    function nextPage() {
+      if ((currentPage * perPage) < signals.length) {
+        currentPage++;
+        renderSignals();
+      }
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderSignals();
+      }
     }
 
     function calculateRSI(prices, period = 14) {
+      if (prices.length < period + 1) return 0;
+
       let gains = 0, losses = 0;
       for (let i = prices.length - period - 1; i < prices.length - 1; i++) {
         const diff = prices[i + 1] - prices[i];
         if (diff >= 0) gains += diff;
         else losses -= diff;
       }
-      const rs = gains / (losses || 1);
-      return 100 - 100 / (1 + rs);
+
+      const avgGain = gains / period;
+      const avgLoss = losses / period;
+
+      if (avgLoss === 0) return 100;
+      const rs = avgGain / avgLoss;
+      return 100 - (100 / (1 + rs));
     }
 
-    function showSignals(signals) {
-      const container = document.getElementById("signals");
-      if (!signals.length) {
-        container.innerHTML = "❌ Abhi koi strong signal nahi bana.";
-        return;
-      }
+    function calculateMACD(prices) {
+      const ema = (data, period) => {
+        const k = 2 / (period + 1);
+        let emaArray = [data[0]];
+        for (let i = 1; i < data.length; i++) {
+          emaArray.push(data[i] * k + emaArray[i - 1] * (1 - k));
+        }
+        return emaArray;
+      };
 
-      container.innerHTML = "";
-      signals.forEach(sig => {
-        container.innerHTML += `
-          <div class="signal ${sig.strength}">
-            <h3>${sig.symbol}</h3>
-            <p><strong>Entry:</strong> ${sig.entry}</p>
-            <p><strong>Target:</strong> ${sig.target}</p>
-            <p><strong>Stop Loss:</strong> ${sig.stop}</p>
-            <p><strong>Strength:</strong> ${sig.strength.toUpperCase()}</p>
-            <p><strong>Time:</strong> ${sig.time}</p>
-          </div>
-        `;
-      });
+      const ema12 = ema(prices, 12);
+      const ema26 = ema(prices, 26);
+      const macdLine = ema12.map((val, i) => val - ema26[i]);
+      const signalLine = ema(macdLine.slice(26), 9);
+
+      return macdLine[macdLine.length - 1] > signalLine[signalLine.length - 1];
+    }
+
+    function getStrength(entry, support, resistance, rsi) {
+      const nearSupport = entry < support * 1.02;
+      const goodRSI = rsi > 50;
+      const distance = resistance - support;
+
+      if (nearSupport && goodRSI && distance > entry * 0.04) return 'Strong';
+      if (nearSupport || goodRSI) return 'Medium';
+      return 'Weak';
     }
 
     fetchSignals();
   </script>
 </body>
 </html>
-
-
